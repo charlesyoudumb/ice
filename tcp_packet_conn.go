@@ -85,7 +85,7 @@ func (t *tcpPacketConn) startReading(conn net.Conn) {
 
 	for {
 		n, err := readStreamingPacket(conn, buf)
-		// log.Printf("readStreamingPacket read %d bytes", n)
+		log.Printf("readStreamingPacket read %d bytes", n)
 		if err != nil {
 			log.Printf("%w: %s\n", errReadingStreamingPacket, err)
 			t.handleRecv(streamingPacket{nil, conn.RemoteAddr(), err})
@@ -96,7 +96,7 @@ func (t *tcpPacketConn) startReading(conn net.Conn) {
 		data := make([]byte, n)
 		copy(data, buf[:n])
 
-		// log.Printf("Writing read streaming packet to recvChan: %d bytes", len(data))
+		log.Printf("Writing read streaming packet to recvChan: %d bytes", len(data))
 		t.handleRecv(streamingPacket{data, conn.RemoteAddr(), nil})
 	}
 }
