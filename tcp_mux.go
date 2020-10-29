@@ -3,7 +3,10 @@ package ice
 import (
 	"encoding/binary"
 	"io"
+	"io/ioutil"
+	"log"
 	"net"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -53,8 +56,9 @@ type TCPMuxDefault struct {
 	// conns is a map of all tcpPacketConns indexed by ufrag
 	conns map[string]*tcpPacketConn
 
-	mu sync.Mutex
-	wg sync.WaitGroup
+	mu           sync.Mutex
+	wg           sync.WaitGroup
+	externalAddr net.Addr
 }
 
 // TCPMuxParams are parameters for TCPMux.
@@ -70,10 +74,42 @@ func NewTCPMuxDefault(params TCPMuxParams) *TCPMuxDefault {
 		params.Logger = logging.NewDefaultLoggerFactory().NewLogger("ice")
 	}
 
-	m := &TCPMuxDefault{
-		params: &params,
+	req, err := http.NewRequest("GET", "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip", nil)
+	if err != nil {
+		panic(err)
+	}
 
-		conns: map[string]*tcpPacketConn{},
+	req.Header.Set("Metadata-Flavor", "Google")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	externalIP := string(body)
+
+	internalAddr := params.Listener.Addr()
+	_, port, err := net.SplitHostPort(internalAddr.String())
+	if err != nil {
+		panic(err)
+	}
+
+	externalAddr, err := net.ResolveTCPAddr(internalAddr.Network(), net.JoinHostPort(externalIP, port))
+	if err != nil {
+		panic(err)
+	}
+
+	log.Printf("TCPMux: remapped %s -> %s", internalAddr.String(), externalAddr.String())
+
+	m := &TCPMuxDefault{
+		params:       &params,
+		conns:        map[string]*tcpPacketConn{},
+		externalAddr: externalAddr,
 	}
 
 	m.wg.Add(1)
@@ -86,15 +122,15 @@ func NewTCPMuxDefault(params TCPMuxParams) *TCPMuxDefault {
 }
 
 func (m *TCPMuxDefault) start() {
-	m.params.Logger.Infof("Listening TCP on %s\n", m.params.Listener.Addr())
+	log.Printf("Listening TCP on %s\n", m.params.Listener.Addr())
 	for {
 		conn, err := m.params.Listener.Accept()
 		if err != nil {
-			m.params.Logger.Infof("Error accepting connection: %s\n", err)
+			log.Printf("Error accepting connection: %s\n", err)
 			return
 		}
 
-		m.params.Logger.Debugf("Accepted connection from: %s to %s", conn.RemoteAddr(), conn.LocalAddr())
+		log.Printf("Accepted connection from: %s to %s", conn.RemoteAddr(), conn.LocalAddr())
 
 		m.wg.Add(1)
 		go func() {
@@ -106,7 +142,7 @@ func (m *TCPMuxDefault) start() {
 
 // LocalAddr returns the listening address of this TCPMuxDefault.
 func (m *TCPMuxDefault) LocalAddr() net.Addr {
-	return m.params.Listener.Addr()
+	return m.externalAddr
 }
 
 // GetConnByUfrag retrieves an existing or creates a new net.PacketConn.
@@ -202,6 +238,7 @@ func (m *TCPMuxDefault) handleConn(conn net.Conn) {
 
 	packetConn, ok := m.conns[ufrag]
 	if !ok {
+		log.Printf("create packetconn from %s", conn.LocalAddr())
 		packetConn = m.createConn(ufrag, conn.LocalAddr())
 	}
 
