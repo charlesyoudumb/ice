@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"reflect"
 	"sync"
@@ -165,7 +166,7 @@ func (a *Agent) gatherCandidatesLocal(ctx context.Context, networkTypes []Networ
 			case tcp:
 				// Handle ICE TCP passive mode
 
-				a.log.Debugf("GetConn by ufrag: %s\n", a.localUfrag)
+				log.Printf("GetConn by ufrag: %s\n", a.localUfrag)
 				conn, err = a.tcpMux.GetConnByUfrag(a.localUfrag)
 				if err != nil {
 					if !errors.Is(err, ErrTCPMuxNotInitialized) {
@@ -175,6 +176,7 @@ func (a *Agent) gatherCandidatesLocal(ctx context.Context, networkTypes []Networ
 				}
 				port = conn.LocalAddr().(*net.TCPAddr).Port
 				tcpType = TCPTypePassive
+				address = conn.LocalAddr().(*net.TCPAddr).IP.String()
 				// is there a way to verify that the listen address is even
 				// accessible from the current interface.
 			case udp:

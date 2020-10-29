@@ -238,8 +238,7 @@ func (m *TCPMuxDefault) handleConn(conn net.Conn) {
 
 	packetConn, ok := m.conns[ufrag]
 	if !ok {
-		log.Printf("create packetconn from %s", conn.LocalAddr())
-		packetConn = m.createConn(ufrag, conn.LocalAddr())
+		packetConn = m.createConn(ufrag, m.LocalAddr())
 	}
 
 	if err := packetConn.AddConn(conn, buf); err != nil {
