@@ -187,7 +187,7 @@ func (m *TCPMuxDefault) createConn(ufrag string, localAddr net.Addr) *tcpPacketC
 func (m *TCPMuxDefault) closeAndLogError(closer io.Closer) {
 	err := closer.Close()
 	if err != nil {
-		m.params.Logger.Warnf("Error closing connection: %s", err)
+		log.Printf("Error closing connection: %s", err)
 	}
 }
 
@@ -196,7 +196,7 @@ func (m *TCPMuxDefault) handleConn(conn net.Conn) {
 
 	n, err := readStreamingPacket(conn, buf)
 	if err != nil {
-		m.params.Logger.Warnf("Error reading first packet: %s", err)
+		log.Printf("Error reading first packet: %s", err)
 		return
 	}
 
@@ -209,24 +209,24 @@ func (m *TCPMuxDefault) handleConn(conn net.Conn) {
 	copy(msg.Raw, buf)
 	if err = msg.Decode(); err != nil {
 		m.closeAndLogError(conn)
-		m.params.Logger.Warnf("Failed to handle decode ICE from %s to %s: %v\n", conn.RemoteAddr(), conn.LocalAddr(), err)
+		log.Printf("Failed to handle decode ICE from %s to %s: %v\n", conn.RemoteAddr(), conn.LocalAddr(), err)
 		return
 	}
 
 	if m == nil || msg.Type.Method != stun.MethodBinding { // not a stun
 		m.closeAndLogError(conn)
-		m.params.Logger.Warnf("Not a STUN message from %s to %s\n", conn.RemoteAddr(), conn.LocalAddr())
+		log.Printf("Not a STUN message from %s to %s\n", conn.RemoteAddr(), conn.LocalAddr())
 		return
 	}
 
 	for _, attr := range msg.Attributes {
-		m.params.Logger.Debugf("msg attr: %s\n", attr.String())
+		log.Printf("msg attr: %s\n", attr.String())
 	}
 
 	attr, err := msg.Get(stun.AttrUsername)
 	if err != nil {
 		m.closeAndLogError(conn)
-		m.params.Logger.Warnf("No Username attribute in STUN message from %s to %s\n", conn.RemoteAddr(), conn.LocalAddr())
+		log.Printf("No Username attribute in STUN message from %s to %s\n", conn.RemoteAddr(), conn.LocalAddr())
 		return
 	}
 
@@ -243,7 +243,7 @@ func (m *TCPMuxDefault) handleConn(conn net.Conn) {
 
 	if err := packetConn.AddConn(conn, buf); err != nil {
 		m.closeAndLogError(conn)
-		m.params.Logger.Warnf("Error adding conn to tcpPacketConn from %s to %s: %s\n", conn.RemoteAddr(), conn.LocalAddr(), err)
+		log.Printf("Error adding conn to tcpPacketConn from %s to %s: %s\n", conn.RemoteAddr(), conn.LocalAddr(), err)
 		return
 	}
 }

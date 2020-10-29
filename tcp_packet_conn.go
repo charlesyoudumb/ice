@@ -3,6 +3,7 @@ package ice
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -50,7 +51,7 @@ func newTCPPacketConn(params tcpPacketParams) *tcpPacketConn {
 }
 
 func (t *tcpPacketConn) AddConn(conn net.Conn, firstPacketData []byte) error {
-	t.params.Logger.Infof("AddConn: %s %s", conn.RemoteAddr().Network(), conn.RemoteAddr())
+	log.Printf("AddConn: %s %s", conn.RemoteAddr().Network(), conn.RemoteAddr())
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -84,9 +85,9 @@ func (t *tcpPacketConn) startReading(conn net.Conn) {
 
 	for {
 		n, err := readStreamingPacket(conn, buf)
-		// t.params.Logger.Infof("readStreamingPacket read %d bytes", n)
+		// log.Printf("readStreamingPacket read %d bytes", n)
 		if err != nil {
-			t.params.Logger.Infof("%w: %s\n", errReadingStreamingPacket, err)
+			log.Printf("%w: %s\n", errReadingStreamingPacket, err)
 			t.handleRecv(streamingPacket{nil, conn.RemoteAddr(), err})
 			t.removeConn(conn)
 			return
@@ -95,7 +96,7 @@ func (t *tcpPacketConn) startReading(conn net.Conn) {
 		data := make([]byte, n)
 		copy(data, buf[:n])
 
-		// t.params.Logger.Infof("Writing read streaming packet to recvChan: %d bytes", len(data))
+		// log.Printf("Writing read streaming packet to recvChan: %d bytes", len(data))
 		t.handleRecv(streamingPacket{data, conn.RemoteAddr(), nil})
 	}
 }
